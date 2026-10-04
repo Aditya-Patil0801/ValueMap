@@ -3,17 +3,25 @@ import {
   createProperty,
   getProperties,
   getPropertyById,
+  updateProperty,
+  deleteProperty,
 } from "../controllers/propertyController.js";
 
 const router = Router();
 
-// Create a new property
+// Create property
 router.post("/", createProperty);
 
 // Get all properties
 router.get("/", getProperties);
 
-// Get a single property by ID
+// Get property by ID
 router.get("/:id", getPropertyById);
+
+// Update property
+router.put("/:id", updateProperty);
+
+// Delete property
+router.delete("/:id", deleteProperty);
 
 export default router;
