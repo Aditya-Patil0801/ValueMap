@@ -1,4 +1,19 @@
 import { useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+interface ValuationHistory {
+  value: number;
+  valuationDate: string;
+  notes?: string;
+}
 
 interface Property {
   _id: string;
@@ -21,14 +36,20 @@ interface Property {
     valuationDate: string;
   };
 
+  valuationHistory?: ValuationHistory[];
+
   notes?: string;
 }
 
 interface PropertyDetailsProps {
   property: Property;
   onClose: () => void;
-  onPropertyUpdated?: (property: Property) => void;
-  onPropertyDeleted?: (propertyId: string) => void;
+  onPropertyUpdated: (
+    property: Property
+  ) => void;
+  onPropertyDeleted: (
+    propertyId: string
+  ) => void;
 }
 
 function PropertyDetails({
@@ -37,10 +58,6 @@ function PropertyDetails({
   onPropertyUpdated,
   onPropertyDeleted,
 }: PropertyDetailsProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
   const [formData, setFormData] = useState({
     propertyName: property.propertyName,
     address: property.address,
@@ -48,16 +65,39 @@ function PropertyDetails({
     district: property.district || "",
     state: property.state,
     status: property.status,
-    latitude: property.location.coordinates[1].toString(),
-    longitude: property.location.coordinates[0].toString(),
-    currentValue: property.valuation.currentValue.toString(),
-    previousValue:
-      property.valuation.previousValue?.toString() || "",
-    valuationDate: property.valuation.valuationDate
-      ? property.valuation.valuationDate.substring(0, 10)
-      : "",
+    currentValue:
+      property.valuation.currentValue.toString(),
+    valuationDate:
+      property.valuation.valuationDate.split("T")[0],
     notes: property.notes || "",
   });
+
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const valuationHistory = property.valuationHistory || [];
+
+  const chartData = [
+    ...valuationHistory.map((item) => ({
+      date: item.valuationDate,
+      displayDate: new Date(
+        item.valuationDate
+      ).toLocaleDateString("en-IN"),
+      value: item.value,
+    })),
+
+    {
+      date: property.valuation.valuationDate,
+      displayDate: new Date(
+        property.valuation.valuationDate
+      ).toLocaleDateString("en-IN"),
+      value: property.valuation.currentValue,
+    },
+  ].sort(
+    (a, b) =>
+      new Date(a.date).getTime() -
+      new Date(b.date).getTime()
+  );
 
   const formatValue = (value: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -68,53 +108,22 @@ function PropertyDetails({
   };
 
   const handleChange = (
-    event: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    event:
+      | React.ChangeEvent<HTMLInputElement>
+      | React.ChangeEvent<HTMLSelectElement>
+      | React.ChangeEvent<HTMLTextAreaElement>
   ) => {
     const { name, value } = event.target;
 
-    setFormData((previous) => ({
-      ...previous,
+    setFormData((current) => ({
+      ...current,
       [name]: value,
     }));
   };
 
-  const handleUpdate = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-
-    setSaving(true);
-
+  const handleUpdate = async () => {
     try {
-      const updatedData = {
-        propertyName: formData.propertyName,
-        address: formData.address,
-        city: formData.city,
-        district: formData.district,
-        state: formData.state,
-
-        location: {
-          type: "Point" as const,
-          coordinates: [
-            Number(formData.longitude),
-            Number(formData.latitude),
-          ] as [number, number],
-        },
-
-        status: formData.status,
-
-        valuation: {
-          currentValue: Number(formData.currentValue),
-          previousValue: formData.previousValue
-            ? Number(formData.previousValue)
-            : undefined,
-          valuationDate: formData.valuationDate,
-        },
-
-        notes: formData.notes,
-      };
+      setSaving(true);
 
       const response = await fetch(
         `http://localhost:5000/api/properties/${property._id}`,
@@ -123,27 +132,52 @@ function PropertyDetails({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedData),
+          body: JSON.stringify({
+            propertyName: formData.propertyName,
+            address: formData.address,
+            city: formData.city,
+            district: formData.district,
+            state: formData.state,
+
+            status: formData.status,
+
+            valuation: {
+              currentValue: Number(
+                formData.currentValue
+              ),
+              valuationDate:
+                formData.valuationDate,
+            },
+
+            notes: formData.notes,
+          }),
         }
       );
 
       const result = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Failed to update property"
+      if (!result.success) {
+        alert(
+          result.message ||
+            "Failed to update property."
         );
+        return;
       }
 
-      onPropertyUpdated?.(result.data);
+      onPropertyUpdated(result.data);
 
-      setIsEditing(false);
-
-      alert("Property updated successfully!");
+      alert(
+        "Property updated successfully."
+      );
     } catch (error) {
-      console.error("Update failed:", error);
+      console.error(
+        "Failed to update property:",
+        error
+      );
 
-      alert("Failed to update property.");
+      alert(
+        "Failed to update property."
+      );
     } finally {
       setSaving(false);
     }
@@ -151,16 +185,16 @@ function PropertyDetails({
 
   const handleDelete = async () => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${property.propertyName}"? This action cannot be undone.`
+      `Are you sure you want to delete "${property.propertyName}"?`
     );
 
     if (!confirmed) {
       return;
     }
 
-    setDeleting(true);
-
     try {
+      setDeleting(true);
+
       const response = await fetch(
         `http://localhost:5000/api/properties/${property._id}`,
         {
@@ -170,352 +204,422 @@ function PropertyDetails({
 
       const result = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Failed to delete property"
+      if (!result.success) {
+        alert(
+          result.message ||
+            "Failed to delete property."
         );
+        return;
       }
 
-      onPropertyDeleted?.(property._id);
-
+      onPropertyDeleted(property._id);
       onClose();
-
-      alert("Property deleted successfully!");
     } catch (error) {
-      console.error("Delete failed:", error);
+      console.error(
+        "Failed to delete property:",
+        error
+      );
 
-      alert("Failed to delete property.");
+      alert(
+        "Failed to delete property."
+      );
     } finally {
       setDeleting(false);
     }
   };
 
-  if (isEditing) {
-    return (
-      <div className="modal-overlay">
-        <div className="property-details edit-property-modal">
-          <div className="details-header">
-            <div>
-              <p className="subtitle">EDIT PROPERTY</p>
+  const currentValue =
+    property.valuation.currentValue;
 
-              <h2>Update Property</h2>
+  const previousValue =
+    property.valuation.previousValue;
 
-              <p>
-                Modify the property valuation and location details.
-              </p>
-            </div>
+  const valuationChange =
+    previousValue !== undefined
+      ? currentValue - previousValue
+      : null;
 
-            <button
-              className="close-button"
-              onClick={onClose}
-              type="button"
-            >
-              ×
-            </button>
+  const valuationChangePercentage =
+    previousValue !== undefined &&
+    previousValue !== 0
+      ? (valuationChange! / previousValue) * 100
+      : null;
+
+  return (
+    <div className="modal-overlay">
+      <div className="property-details-modal">
+        <div className="property-details-header">
+          <div>
+            <p className="subtitle">
+              PROPERTY DETAILS
+            </p>
+
+            <h2>{property.propertyName}</h2>
+
+            <p>
+              {property.address},{" "}
+              {property.city},{" "}
+              {property.state}
+            </p>
           </div>
 
-          <form onSubmit={handleUpdate}>
-            <div className="edit-form-grid">
-              <div className="form-group">
-                <label>Property Name</label>
+          <button
+            type="button"
+            className="close-button"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
 
-                <input
-                  type="text"
-                  name="propertyName"
-                  value={formData.propertyName}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+        <div className="property-details-content">
+          <div className="property-form-grid">
+            <div className="form-group">
+              <label>
+                Property Name
+              </label>
 
-              <div className="form-group">
-                <label>Address</label>
+              <input
+                name="propertyName"
+                value={
+                  formData.propertyName
+                }
+                onChange={handleChange}
+              />
+            </div>
 
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                Address
+              </label>
 
-              <div className="form-group">
-                <label>City</label>
+              <input
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+              />
+            </div>
 
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                City
+              </label>
 
-              <div className="form-group">
-                <label>District</label>
+              <input
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+              />
+            </div>
 
-                <input
-                  type="text"
-                  name="district"
-                  value={formData.district}
-                  onChange={handleChange}
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                District
+              </label>
 
-              <div className="form-group">
-                <label>State</label>
+              <input
+                name="district"
+                value={
+                  formData.district
+                }
+                onChange={handleChange}
+              />
+            </div>
 
-                <input
-                  type="text"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                State
+              </label>
 
-              <div className="form-group">
-                <label>Status</label>
+              <input
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+              />
+            </div>
 
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                >
-                  <option value="Pending">Pending</option>
+            <div className="form-group">
+              <label>
+                Status
+              </label>
 
-                  <option value="Under Construction">
-                    Under Construction
-                  </option>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+              >
+                <option value="Completed">
+                  Completed
+                </option>
 
-                  <option value="Completed">
-                    Completed
-                  </option>
-                </select>
-              </div>
+                <option value="Under Construction">
+                  Under Construction
+                </option>
 
-              <div className="form-group">
-                <label>Latitude</label>
+                <option value="Pending">
+                  Pending
+                </option>
+              </select>
+            </div>
 
-                <input
-                  type="number"
-                  step="any"
-                  name="latitude"
-                  value={formData.latitude}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                Current Valuation
+              </label>
 
-              <div className="form-group">
-                <label>Longitude</label>
+              <input
+                type="number"
+                name="currentValue"
+                value={
+                  formData.currentValue
+                }
+                onChange={handleChange}
+              />
+            </div>
 
-                <input
-                  type="number"
-                  step="any"
-                  name="longitude"
-                  value={formData.longitude}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                Valuation Date
+              </label>
 
-              <div className="form-group">
-                <label>Current Value (₹)</label>
-
-                <input
-                  type="number"
-                  name="currentValue"
-                  value={formData.currentValue}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Previous Value (₹)</label>
-
-                <input
-                  type="number"
-                  name="previousValue"
-                  value={formData.previousValue}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Valuation Date</label>
-
-                <input
-                  type="date"
-                  name="valuationDate"
-                  value={formData.valuationDate}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+              <input
+                type="date"
+                name="valuationDate"
+                value={
+                  formData.valuationDate
+                }
+                onChange={handleChange}
+              />
             </div>
 
             <div className="form-group full-width">
-              <label>Notes</label>
+              <label>
+                Notes
+              </label>
 
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
                 rows={4}
-                placeholder="Add valuation notes..."
               />
             </div>
+          </div>
 
-            <div className="details-actions">
-              <button
-                type="button"
-                className="cancel-button"
-                onClick={() => setIsEditing(false)}
-                disabled={saving}
-              >
-                Cancel
-              </button>
+          <div className="valuation-analytics">
+            <h3>
+              Valuation Analytics
+            </h3>
 
-              <button
-                type="submit"
-                className="add-button"
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
+            <div className="valuation-analytics-grid">
+              <div className="analytics-card">
+                <span>
+                  Current Value
+                </span>
+
+                <strong>
+                  {formatValue(
+                    currentValue
+                  )}
+                </strong>
+              </div>
+
+              <div className="analytics-card">
+                <span>
+                  Previous Value
+                </span>
+
+                <strong>
+                  {previousValue !==
+                  undefined
+                    ? formatValue(
+                        previousValue
+                      )
+                    : "N/A"}
+                </strong>
+              </div>
+
+              <div className="analytics-card">
+                <span>
+                  Change
+                </span>
+
+                <strong>
+                  {valuationChange !==
+                  null
+                    ? formatValue(
+                        valuationChange
+                      )
+                    : "N/A"}
+                </strong>
+              </div>
+
+              <div className="analytics-card">
+                <span>
+                  Change %
+                </span>
+
+                <strong>
+                  {valuationChangePercentage !==
+                  null
+                    ? `${valuationChangePercentage.toFixed(
+                        2
+                      )}%`
+                    : "N/A"}
+                </strong>
+              </div>
             </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  const [longitude, latitude] = property.location.coordinates;
-
-  return (
-    <div className="modal-overlay">
-      <div className="property-details">
-        <div className="details-header">
-          <div>
-            <p className="subtitle">PROPERTY DETAILS</p>
-
-            <h2>{property.propertyName}</h2>
-
-            <p>{property.address}</p>
           </div>
 
+          {chartData.length > 1 && (
+            <div className="valuation-history">
+              <h3>
+                Valuation Trend
+              </h3>
+
+              <div className="valuation-chart">
+  <ResponsiveContainer
+    width="100%"
+    height={280}
+    minWidth={0}
+    minHeight={280}
+  >
+    <LineChart
+      data={chartData}
+      margin={{
+        top: 10,
+        right: 20,
+        left: 20,
+        bottom: 10,
+      }}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+
+      <XAxis
+        dataKey="displayDate"
+        tick={{ fontSize: 12 }}
+      />
+
+      <YAxis
+        tick={{ fontSize: 12 }}
+        tickFormatter={(value) =>
+          `₹${(Number(value) / 100000).toFixed(0)}L`
+        }
+      />
+
+      <Tooltip
+        formatter={(value) =>
+          formatValue(Number(value))
+        }
+      />
+
+      <Line
+        type="monotone"
+        dataKey="value"
+        stroke="#2563eb"
+        strokeWidth={3}
+        dot={{
+          r: 5,
+          fill: "#2563eb",
+        }}
+        activeDot={{
+          r: 7,
+        }}
+      />
+    </LineChart>
+  </ResponsiveContainer>
+</div>
+            </div>
+          )}
+
+          <div className="valuation-history">
+            <h3>
+              Valuation History
+            </h3>
+
+            {valuationHistory.length ===
+            0 ? (
+              <p>
+                No previous valuation
+                history available.
+              </p>
+            ) : (
+              <div className="valuation-history-list">
+                {valuationHistory
+                  .slice()
+                  .reverse()
+                  .map(
+                    (
+                      history,
+                      index
+                    ) => (
+                      <div
+                        className="valuation-history-item"
+                        key={`${history.valuationDate}-${index}`}
+                      >
+                        <div>
+                          <strong>
+                            {formatValue(
+                              history.value
+                            )}
+                          </strong>
+
+                          <span>
+                            {new Date(
+                              history.valuationDate
+                            ).toLocaleDateString(
+                              "en-IN"
+                            )}
+                          </span>
+                        </div>
+
+                        {history.notes && (
+                          <p>
+                            {
+                              history.notes
+                            }
+                          </p>
+                        )}
+                      </div>
+                    )
+                  )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="property-details-footer">
           <button
-            className="close-button"
-            onClick={onClose}
             type="button"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="details-grid">
-          <div className="detail-card">
-            <span>Status</span>
-
-            <strong>{property.status}</strong>
-          </div>
-
-          <div className="detail-card">
-            <span>Current Valuation</span>
-
-            <strong>
-              {formatValue(
-                property.valuation.currentValue
-              )}
-            </strong>
-          </div>
-
-          <div className="detail-card">
-            <span>Previous Valuation</span>
-
-            <strong>
-              {property.valuation.previousValue
-                ? formatValue(
-                    property.valuation.previousValue
-                  )
-                : "Not available"}
-            </strong>
-          </div>
-
-          <div className="detail-card">
-            <span>Valuation Date</span>
-
-            <strong>
-              {new Date(
-                property.valuation.valuationDate
-              ).toLocaleDateString("en-IN")}
-            </strong>
-          </div>
-        </div>
-
-        <div className="details-section">
-          <h3>Location</h3>
-
-          <div className="location-details">
-            <p>
-              <strong>City:</strong> {property.city}
-            </p>
-
-            <p>
-              <strong>District:</strong>{" "}
-              {property.district || "Not available"}
-            </p>
-
-            <p>
-              <strong>State:</strong> {property.state}
-            </p>
-
-            <p>
-              <strong>Latitude:</strong> {latitude}
-            </p>
-
-            <p>
-              <strong>Longitude:</strong> {longitude}
-            </p>
-          </div>
-        </div>
-
-        <div className="details-section">
-          <h3>Notes</h3>
-
-          <div className="notes-box">
-            {property.notes || "No notes available."}
-          </div>
-        </div>
-
-        <div className="details-actions">
-          <button
-            className="cancel-button"
-            onClick={onClose}
-            type="button"
-          >
-            Close
-          </button>
-
-          <button
-            className="add-button"
-            onClick={() => setIsEditing(true)}
-            type="button"
-          >
-            Edit Property
-          </button>
-
-          <button
             className="delete-button"
             onClick={handleDelete}
-            type="button"
             disabled={deleting}
           >
-            {deleting ? "Deleting..." : "Delete Property"}
+            {deleting
+              ? "Deleting..."
+              : "Delete Property"}
           </button>
+
+          <div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleUpdate}
+              disabled={saving}
+            >
+              {saving
+                ? "Saving..."
+                : "Save Changes"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

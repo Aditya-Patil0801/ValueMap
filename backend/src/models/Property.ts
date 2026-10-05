@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+interface IValuationHistory {
+  value: number;
+  valuationDate: Date;
+  notes?: string;
+}
+
 export interface IProperty extends Document {
   propertyName: string;
   address: string;
@@ -20,9 +26,34 @@ export interface IProperty extends Document {
     valuationDate: Date;
   };
 
+  valuationHistory: IValuationHistory[];
+
   notes?: string;
   photos: string[];
 }
+
+const valuationHistorySchema =
+  new Schema<IValuationHistory>(
+    {
+      value: {
+        type: Number,
+        required: true,
+      },
+
+      valuationDate: {
+        type: Date,
+        required: true,
+      },
+
+      notes: {
+        type: String,
+        trim: true,
+      },
+    },
+    {
+      _id: false,
+    }
+  );
 
 const propertySchema = new Schema<IProperty>(
   {
@@ -70,7 +101,11 @@ const propertySchema = new Schema<IProperty>(
 
     status: {
       type: String,
-      enum: ["Completed", "Under Construction", "Pending"],
+      enum: [
+        "Completed",
+        "Under Construction",
+        "Pending",
+      ],
       default: "Pending",
     },
 
@@ -90,6 +125,11 @@ const propertySchema = new Schema<IProperty>(
       },
     },
 
+    valuationHistory: {
+      type: [valuationHistorySchema],
+      default: [],
+    },
+
     notes: {
       type: String,
       trim: true,
@@ -100,6 +140,7 @@ const propertySchema = new Schema<IProperty>(
       default: [],
     },
   },
+
   {
     timestamps: true,
   }
@@ -109,6 +150,9 @@ propertySchema.index({
   location: "2dsphere",
 });
 
-const Property = mongoose.model<IProperty>("Property", propertySchema);
+const Property = mongoose.model<IProperty>(
+  "Property",
+  propertySchema
+);
 
 export default Property;

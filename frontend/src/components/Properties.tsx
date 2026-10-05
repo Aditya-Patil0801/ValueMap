@@ -29,6 +29,12 @@ interface PropertiesProps {
   onPropertiesChanged: () => void;
 }
 
+type StatusFilter =
+  | "All"
+  | "Completed"
+  | "Under Construction"
+  | "Pending";
+
 function Properties({
   onPropertiesChanged,
 }: PropertiesProps) {
@@ -36,6 +42,10 @@ function Properties({
   const [loading, setLoading] = useState(true);
   const [selectedProperty, setSelectedProperty] =
     useState<Property | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("All");
 
   const fetchProperties = async () => {
     try {
@@ -45,11 +55,22 @@ function Properties({
 
       const result = await response.json();
 
-      if (result.success) {
-        setProperties(result.data);
+      if (result.success && Array.isArray(result.data)) {
+        // Remove any invalid/undefined entries
+        const validProperties = result.data.filter(
+          (property: Property | undefined): property is Property =>
+            property !== undefined &&
+            property !== null &&
+            typeof property.propertyName === "string"
+        );
+
+        setProperties(validProperties);
+      } else {
+        setProperties([]);
       }
     } catch (error) {
       console.error("Failed to fetch properties:", error);
+      setProperties([]);
     } finally {
       setLoading(false);
     }
@@ -75,12 +96,16 @@ function Properties({
     onPropertiesChanged();
   };
 
-  const handlePropertyDeleted = (propertyId: string) => {
+  const handlePropertyDeleted = (
+    propertyId: string
+  ) => {
     setProperties((currentProperties) =>
       currentProperties.filter(
         (property) => property._id !== propertyId
       )
     );
+
+    setSelectedProperty(null);
 
     onPropertiesChanged();
   };
@@ -91,6 +116,48 @@ function Properties({
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  const filteredProperties = properties.filter(
+    (property) => {
+      // Safety check
+      if (!property) {
+        return false;
+      }
+
+      const search = searchTerm
+        .trim()
+        .toLowerCase();
+
+      const matchesSearch =
+        !search ||
+        property.propertyName
+          .toLowerCase()
+          .includes(search) ||
+        property.address
+          .toLowerCase()
+          .includes(search) ||
+        property.city
+          .toLowerCase()
+          .includes(search) ||
+        property.district
+          ?.toLowerCase()
+          .includes(search) ||
+        property.state
+          .toLowerCase()
+          .includes(search);
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        property.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    }
+  );
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
   };
 
   if (loading) {
@@ -121,14 +188,79 @@ function Properties({
             <h2>Properties</h2>
 
             <p>
-              View all properties and their latest valuation
-              details.
+              View all properties and their latest
+              valuation details.
             </p>
           </div>
 
           <span className="property-count">
+            {filteredProperties.length} of{" "}
             {properties.length} Properties
           </span>
+        </div>
+
+        <div className="property-search">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) =>
+              setSearchTerm(event.target.value)
+            }
+            placeholder="Search by property name, address, city, district or state..."
+          />
+
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm("")}
+              className="clear-search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <div className="property-filters">
+          <span className="filter-label">
+            Filter by status:
+          </span>
+
+          <div className="filter-buttons">
+            {(
+              [
+                "All",
+                "Completed",
+                "Under Construction",
+                "Pending",
+              ] as StatusFilter[]
+            ).map((status) => (
+              <button
+                key={status}
+                type="button"
+                className={`filter-button ${
+                  statusFilter === status
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setStatusFilter(status)
+                }
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+
+          {(searchTerm ||
+            statusFilter !== "All") && (
+            <button
+              type="button"
+              className="clear-filters-button"
+              onClick={clearFilters}
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
         <div className="properties-table-wrapper">
@@ -144,63 +276,69 @@ function Properties({
             </thead>
 
             <tbody>
-              {properties.map((property) => (
-                <tr
-                  key={property._id}
-                  onClick={() =>
-                    setSelectedProperty(property)
-                  }
-                  className="property-row"
-                >
-                  <td>
-                    <strong>
-                      {property.propertyName}
-                    </strong>
+              {filteredProperties.map(
+                (property) => (
+                  <tr
+                    key={property._id}
+                    onClick={() =>
+                      setSelectedProperty(property)
+                    }
+                    className="property-row"
+                  >
+                    <td>
+                      <strong>
+                        {property.propertyName}
+                      </strong>
 
-                    <span>
-                      {property.address}
-                    </span>
-                  </td>
+                      <span>
+                        {property.address}
+                      </span>
+                    </td>
 
-                  <td>
-                    {property.city}, {property.state}
-                  </td>
+                    <td>
+                      {property.city},{" "}
+                      {property.state}
+                    </td>
 
-                  <td>
-                    <span
-                      className={`status-badge ${property.status
-                        .toLowerCase()
-                        .replaceAll(" ", "-")}`}
-                    >
-                      {property.status}
-                    </span>
-                  </td>
+                    <td>
+                      <span
+                        className={`status-badge ${property.status
+                          .toLowerCase()
+                          .replaceAll(" ", "-")}`}
+                      >
+                        {property.status}
+                      </span>
+                    </td>
 
-                  <td>
-                    <strong>
-                      {formatValue(
-                        property.valuation.currentValue
-                      )}
-                    </strong>
-                  </td>
+                    <td>
+                      <strong>
+                        {formatValue(
+                          property.valuation
+                            .currentValue
+                        )}
+                      </strong>
+                    </td>
 
-                  <td>
-                    {new Date(
-                      property.valuation.valuationDate
-                    ).toLocaleDateString("en-IN")}
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      {new Date(
+                        property.valuation
+                          .valuationDate
+                      ).toLocaleDateString("en-IN")}
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>
 
-        {properties.length === 0 && (
+        {filteredProperties.length === 0 && (
           <div className="empty-properties">
             <h3>No properties found</h3>
 
             <p>
-              Add your first property to get started.
+              Try changing your search or status
+              filter.
             </p>
           </div>
         )}

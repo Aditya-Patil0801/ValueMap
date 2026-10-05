@@ -85,14 +85,7 @@ export const updateProperty = async (
   res: Response
 ): Promise<void> => {
   try {
-    const property = await Property.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const property = await Property.findById(req.params.id);
 
     if (!property) {
       res.status(404).json({
@@ -101,6 +94,29 @@ export const updateProperty = async (
       });
       return;
     }
+
+    const newCurrentValue =
+      req.body.valuation?.currentValue;
+
+    const valuationHasChanged =
+      typeof newCurrentValue === "number" &&
+      newCurrentValue !==
+        property.valuation.currentValue;
+
+    if (valuationHasChanged) {
+      property.valuationHistory.push({
+        value: property.valuation.currentValue,
+        valuationDate:
+          property.valuation.valuationDate,
+        notes:
+          property.notes ||
+          "Previous valuation recorded automatically.",
+      });
+    }
+
+    property.set(req.body);
+
+    await property.save();
 
     res.status(200).json({
       success: true,
