@@ -14,7 +14,10 @@ interface Property {
     coordinates: [number, number];
   };
 
-  status: "Completed" | "Under Construction" | "Pending";
+  status:
+    | "Completed"
+    | "Under Construction"
+    | "Pending";
 
   valuation: {
     currentValue: number;
@@ -25,27 +28,37 @@ interface Property {
   notes?: string;
 }
 
-interface PropertiesProps {
-  onPropertiesChanged: () => void;
-}
-
 type StatusFilter =
   | "All"
   | "Completed"
   | "Under Construction"
   | "Pending";
 
+interface PropertiesProps {
+  onPropertiesChanged: () => void;
+  selectedStatus?: StatusFilter;
+}
+
 function Properties({
   onPropertiesChanged,
+  selectedStatus,
 }: PropertiesProps) {
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [properties, setProperties] =
+    useState<Property[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
   const [selectedProperty, setSelectedProperty] =
     useState<Property | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] =
+    useState("");
+
   const [statusFilter, setStatusFilter] =
-    useState<StatusFilter>("All");
+    useState<StatusFilter>(
+      selectedStatus ?? "All"
+    );
 
   const fetchProperties = async () => {
     try {
@@ -55,13 +68,18 @@ function Properties({
 
       const result = await response.json();
 
-      if (result.success && Array.isArray(result.data)) {
-        // Remove any invalid/undefined entries
+      if (
+        result.success &&
+        Array.isArray(result.data)
+      ) {
         const validProperties = result.data.filter(
-          (property: Property | undefined): property is Property =>
+          (
+            property: Property | undefined
+          ): property is Property =>
             property !== undefined &&
             property !== null &&
-            typeof property.propertyName === "string"
+            typeof property.propertyName ===
+              "string"
         );
 
         setProperties(validProperties);
@@ -69,7 +87,11 @@ function Properties({
         setProperties([]);
       }
     } catch (error) {
-      console.error("Failed to fetch properties:", error);
+      console.error(
+        "Failed to fetch properties:",
+        error
+      );
+
       setProperties([]);
     } finally {
       setLoading(false);
@@ -80,15 +102,23 @@ function Properties({
     fetchProperties();
   }, []);
 
+  useEffect(() => {
+    if (selectedStatus) {
+      setStatusFilter(selectedStatus);
+    }
+  }, [selectedStatus]);
+
   const handlePropertyUpdated = (
     updatedProperty: Property
   ) => {
-    setProperties((currentProperties) =>
-      currentProperties.map((property) =>
-        property._id === updatedProperty._id
-          ? updatedProperty
-          : property
-      )
+    setProperties(
+      (currentProperties) =>
+        currentProperties.map((property) =>
+          property._id ===
+          updatedProperty._id
+            ? updatedProperty
+            : property
+        )
     );
 
     setSelectedProperty(updatedProperty);
@@ -99,10 +129,12 @@ function Properties({
   const handlePropertyDeleted = (
     propertyId: string
   ) => {
-    setProperties((currentProperties) =>
-      currentProperties.filter(
-        (property) => property._id !== propertyId
-      )
+    setProperties(
+      (currentProperties) =>
+        currentProperties.filter(
+          (property) =>
+            property._id !== propertyId
+        )
     );
 
     setSelectedProperty(null);
@@ -118,9 +150,8 @@ function Properties({
     }).format(value);
   };
 
-  const filteredProperties = properties.filter(
-    (property) => {
-      // Safety check
+  const filteredProperties =
+    properties.filter((property) => {
       if (!property) {
         return false;
       }
@@ -151,9 +182,11 @@ function Properties({
         statusFilter === "All" ||
         property.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
-    }
-  );
+      return (
+        matchesSearch &&
+        matchesStatus
+      );
+    });
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -168,7 +201,9 @@ function Properties({
       >
         <h2>Properties</h2>
 
-        <p>Loading properties...</p>
+        <p>
+          Loading properties...
+        </p>
       </section>
     );
   }
@@ -188,8 +223,8 @@ function Properties({
             <h2>Properties</h2>
 
             <p>
-              View all properties and their latest
-              valuation details.
+              View all properties and their
+              latest valuation details.
             </p>
           </div>
 
@@ -204,7 +239,9 @@ function Properties({
             type="text"
             value={searchTerm}
             onChange={(event) =>
-              setSearchTerm(event.target.value)
+              setSearchTerm(
+                event.target.value
+              )
             }
             placeholder="Search by property name, address, city, district or state..."
           />
@@ -212,7 +249,9 @@ function Properties({
           {searchTerm && (
             <button
               type="button"
-              onClick={() => setSearchTerm("")}
+              onClick={() =>
+                setSearchTerm("")
+              }
               className="clear-search"
             >
               ×
@@ -281,13 +320,17 @@ function Properties({
                   <tr
                     key={property._id}
                     onClick={() =>
-                      setSelectedProperty(property)
+                      setSelectedProperty(
+                        property
+                      )
                     }
                     className="property-row"
                   >
                     <td>
                       <strong>
-                        {property.propertyName}
+                        {
+                          property.propertyName
+                        }
                       </strong>
 
                       <span>
@@ -304,7 +347,10 @@ function Properties({
                       <span
                         className={`status-badge ${property.status
                           .toLowerCase()
-                          .replaceAll(" ", "-")}`}
+                          .replaceAll(
+                            " ",
+                            "-"
+                          )}`}
                       >
                         {property.status}
                       </span>
@@ -323,7 +369,9 @@ function Properties({
                       {new Date(
                         property.valuation
                           .valuationDate
-                      ).toLocaleDateString("en-IN")}
+                      ).toLocaleDateString(
+                        "en-IN"
+                      )}
                     </td>
                   </tr>
                 )
@@ -332,13 +380,16 @@ function Properties({
           </table>
         </div>
 
-        {filteredProperties.length === 0 && (
+        {filteredProperties.length ===
+          0 && (
           <div className="empty-properties">
-            <h3>No properties found</h3>
+            <h3>
+              No properties found
+            </h3>
 
             <p>
-              Try changing your search or status
-              filter.
+              Try changing your search or
+              status filter.
             </p>
           </div>
         )}
