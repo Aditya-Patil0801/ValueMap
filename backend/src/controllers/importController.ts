@@ -143,7 +143,10 @@ const normalizeHeader = (value: unknown): string =>
   textValue(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const normalizeKey = (value: string): string =>
-  value.trim().toLowerCase().replace(/\s+/g, " ");
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -555,25 +558,24 @@ export const confirmExcelImport = async (
       }
 
       seenInUpload.add(duplicateKey);
+      const existingProperties = await Property.find({})
+  .select("propertyName address city state")
+  .lean();
 
-      const existing = await Property.findOne({
-        propertyName: {
-          $regex: `^${escapeRegex(propertyName)}$`,
-          $options: "i",
-        },
-        address: {
-          $regex: `^${escapeRegex(address)}$`,
-          $options: "i",
-        },
-        city: {
-          $regex: `^${escapeRegex(city)}$`,
-          $options: "i",
-        },
-        state: {
-          $regex: `^${escapeRegex(state)}$`,
-          $options: "i",
-        },
-      }).select("_id");
+
+const normalizedPropertyName = normalizeKey(propertyName);
+const normalizedAddress = normalizeKey(address);
+const normalizedCity = normalizeKey(city);
+const normalizedState = normalizeKey(state);
+
+const existing = existingProperties.find((property) => {
+  return (
+    normalizeKey(property.propertyName) === normalizedPropertyName &&
+    normalizeKey(property.address) === normalizedAddress &&
+    normalizeKey(property.city) === normalizedCity &&
+    normalizeKey(property.state) === normalizedState
+  );
+});
 
       if (existing) {
         skipped.push({
