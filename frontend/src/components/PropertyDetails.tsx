@@ -261,6 +261,27 @@ function PropertyDetails({
               {property.city},{" "}
               {property.state}
             </p>
+            <button
+  type="button"
+  className="export-button"
+  onClick={async () => {
+    const [longitude, latitude] =
+      property.location.coordinates;
+
+    try {
+      await navigator.clipboard.writeText(
+        `${latitude}, ${longitude}`
+      );
+      alert("Coordinates copied successfully!");
+    } catch {
+      alert(
+        `Coordinates: ${latitude}, ${longitude}`
+      );
+    }
+  }}
+>
+  📍 Copy Coordinates
+</button>
           </div>
 
           <button
