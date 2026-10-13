@@ -386,6 +386,27 @@ function PropertyDetails({
             ×
           </button>
         </div>
+
+<button
+  type="button"
+  className="export-button"
+  onClick={async () => {
+    const [longitude, latitude] =
+      property.location.coordinates;
+
+    const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+    try {
+      await navigator.clipboard.writeText(mapsUrl);
+      alert("Google Maps link copied successfully!");
+    } catch {
+      window.prompt("Copy this Google Maps link:", mapsUrl);
+    }
+  }}
+>
+  📍 Copy Google Maps Link
+</button>
+
       <button
   type="button"
   className="export-button"
