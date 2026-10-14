@@ -430,6 +430,10 @@ export const confirmExcelImport = async (
       reason: string;
     }> = [];
     const seenInUpload = new Set<string>();
+const existingProperties = await Property.find({})
+  .select("propertyName address city state")
+  .lean();
+
 
     for (const item of req.body.properties as unknown[]) {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -558,9 +562,7 @@ export const confirmExcelImport = async (
       }
 
       seenInUpload.add(duplicateKey);
-      const existingProperties = await Property.find({})
-  .select("propertyName address city state")
-  .lean();
+
 
 
 const normalizedPropertyName = normalizeKey(propertyName);
