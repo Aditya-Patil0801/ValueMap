@@ -564,15 +564,6 @@ function PropertyDetails({
 >
   📍 Copy Google Maps Link
 </button>
-
-      <button
-  type="button"
-  className="export-button"
-  onClick={handleDownloadReport}
->
-  ↓ Download PDF Report
-</button>
-
         <div className="property-details-content">
           <div className="property-form-grid">
             <div className="form-group">
@@ -920,6 +911,13 @@ function PropertyDetails({
                 ? "Saving..."
                 : "Save Changes"}
             </button>
+            <button
+  type="button"
+  className="download-report-button"
+  onClick={handleDownloadReport}
+>
+  <span>↓</span> Download Valuation Report (PDF)
+</button>
           </div>
         </div>
       </div>
