@@ -38,16 +38,90 @@ function AddProperty({
     LocationResult[]
   >([]);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    ([
+      ["propertyName", "Property name"],
+      ["address", "Address"],
+      ["city", "City"],
+      ["state", "State"],
+    ] as const).forEach(([field, label]) => {
+      if (!formData[field].trim()) errors[field] = `${label} is required.`;
+    });
+
+    const currentValue = Number(formData.currentValue);
+    if (!formData.currentValue.trim()) {
+      errors.currentValue = "Current valuation is required.";
+    } else if (!Number.isFinite(currentValue) || currentValue <= 0) {
+      errors.currentValue = "Enter a valid valuation greater than ₹0.";
+    }
+
+    if (formData.previousValue.trim()) {
+      const previousValue = Number(formData.previousValue);
+      if (!Number.isFinite(previousValue) || previousValue < 0) {
+        errors.previousValue = "Previous valuation must be zero or greater.";
+      }
+    }
+
+    if (!formData.valuationDate) {
+      errors.valuationDate = "Valuation date is required.";
+    } else {
+      const date = new Date(`${formData.valuationDate}T00:00:00`);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (Number.isNaN(date.getTime())) {
+        errors.valuationDate = "Enter a valid valuation date.";
+      } else if (date > today) {
+        errors.valuationDate = "Valuation date cannot be in the future.";
+      }
+    }
+
+    if (!formData.latitude.trim()) {
+      errors.latitude = "Search for and select a property location.";
+    } else {
+      const latitude = Number(formData.latitude);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+        errors.latitude = "Latitude must be between -90 and 90.";
+      }
+    }
+
+    if (!formData.longitude.trim()) {
+      errors.longitude = "Search for and select a property location.";
+    } else {
+      const longitude = Number(formData.longitude);
+      if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        errors.longitude = "Longitude must be between -180 and 180.";
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const renderFieldError = (field: string) =>
+    fieldErrors[field] ? (
+      <p className="field-error" role="alert">
+        {fieldErrors[field]}
+      </p>
+    ) : null;
 
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+    setFormData((previous) => ({ ...previous, [name]: value }));
+    setFieldErrors((previous) => {
+      if (!previous[name]) return previous;
+      const next = { ...previous };
+      delete next[name];
+      return next;
     });
+    if (error) setError("");
   };
 
   const searchLocation = async () => {
@@ -122,15 +196,13 @@ function AddProperty({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!formData.latitude || !formData.longitude) {
-      setError(
-        "Please search and select a property location before saving."
-      );
+    setError("");
+    if (!validateForm()) {
+      setError("Please correct the highlighted fields before saving.");
       return;
     }
 
     setSaving(true);
-    setError("");
 
     try {
       const response = await fetch(
@@ -220,6 +292,7 @@ function AddProperty({
 
         {error && (
           <div
+            role="alert"
             style={{
               marginBottom: "20px",
               padding: "12px",
@@ -245,6 +318,7 @@ function AddProperty({
                 placeholder="e.g. Global City Building B"
                 required
               />
+            {renderFieldError("propertyName")}
             </div>
 
             <div className="form-group">
@@ -258,6 +332,7 @@ function AddProperty({
                 placeholder="Enter property address"
                 required
               />
+            {renderFieldError("address")}
             </div>
 
             <div className="form-group">
@@ -271,6 +346,7 @@ function AddProperty({
                 placeholder="Enter city"
                 required
               />
+            {renderFieldError("city")}
             </div>
 
             <div className="form-group">
@@ -296,6 +372,7 @@ function AddProperty({
                 placeholder="Enter state"
                 required
               />
+            {renderFieldError("state")}
             </div>
 
             <div className="form-group">
@@ -411,9 +488,12 @@ function AddProperty({
                 onChange={handleChange}
                 type="number"
                 step="any"
+                min="-180"
+                max="180"
                 placeholder="Automatically filled"
                 required
               />
+            {renderFieldError("latitude")}
             </div>
 
             <div className="form-group">
@@ -428,6 +508,7 @@ function AddProperty({
                 placeholder="Automatically filled"
                 required
               />
+            {renderFieldError("longitude")}
             </div>
 
             <div className="form-group">
@@ -438,9 +519,12 @@ function AddProperty({
                 value={formData.currentValue}
                 onChange={handleChange}
                 type="number"
+                min="0.01"
+                step="any"
                 placeholder="Enter current valuation"
                 required
               />
+            {renderFieldError("currentValue")}
             </div>
 
             <div className="form-group">
@@ -451,8 +535,11 @@ function AddProperty({
                 value={formData.previousValue}
                 onChange={handleChange}
                 type="number"
+                min="0"
+                step="any"
                 placeholder="Enter previous valuation"
               />
+            {renderFieldError("previousValue")}
             </div>
 
             <div className="form-group">
@@ -463,8 +550,10 @@ function AddProperty({
                 value={formData.valuationDate}
                 onChange={handleChange}
                 type="date"
+                max={new Date().toISOString().split("T")[0]}
                 required
               />
+            {renderFieldError("valuationDate")}
             </div>
           </div>
 

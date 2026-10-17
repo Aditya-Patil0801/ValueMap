@@ -75,6 +75,7 @@ function PropertyDetails({
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const valuationHistory = property.valuationHistory || [];
 
@@ -371,9 +372,60 @@ function PropertyDetails({
       ...current,
       [name]: value,
     }));
+
+    setFieldErrors((current) => {
+      if (!current[name]) return current;
+      const updated = { ...current };
+      delete updated[name];
+      return updated;
+    });
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.propertyName.trim()) {
+      errors.propertyName = "Property name is required.";
+    }
+    if (!formData.address.trim()) {
+      errors.address = "Address is required.";
+    }
+    if (!formData.city.trim()) {
+      errors.city = "City is required.";
+    }
+    if (!formData.state.trim()) {
+      errors.state = "State is required.";
+    }
+
+    const value = Number(formData.currentValue);
+    if (!formData.currentValue.trim()) {
+      errors.currentValue = "Current valuation is required.";
+    } else if (!Number.isFinite(value) || value <= 0) {
+      errors.currentValue = "Current valuation must be greater than ₹0.";
+    }
+
+    if (!formData.valuationDate) {
+      errors.valuationDate = "Valuation date is required.";
+    } else {
+      const selectedDate = new Date(`${formData.valuationDate}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (Number.isNaN(selectedDate.getTime())) {
+        errors.valuationDate = "Please enter a valid valuation date.";
+      } else if (selectedDate > today) {
+        errors.valuationDate = "Valuation date cannot be in the future.";
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleUpdate = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -577,7 +629,9 @@ function PropertyDetails({
                   formData.propertyName
                 }
                 onChange={handleChange}
+                required
               />
+              {fieldErrors.propertyName && <small className="field-error">{fieldErrors.propertyName}</small>}
             </div>
 
             <div className="form-group">
@@ -589,7 +643,9 @@ function PropertyDetails({
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
+                required
               />
+              {fieldErrors.address && <small className="field-error">{fieldErrors.address}</small>}
             </div>
 
             <div className="form-group">
@@ -601,7 +657,9 @@ function PropertyDetails({
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
+                required
               />
+              {fieldErrors.city && <small className="field-error">{fieldErrors.city}</small>}
             </div>
 
             <div className="form-group">
@@ -627,7 +685,9 @@ function PropertyDetails({
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
+                required
               />
+              {fieldErrors.state && <small className="field-error">{fieldErrors.state}</small>}
             </div>
 
             <div className="form-group">
@@ -666,7 +726,11 @@ function PropertyDetails({
                   formData.currentValue
                 }
                 onChange={handleChange}
+                min="0.01"
+                step="any"
+                required
               />
+              {fieldErrors.currentValue && <small className="field-error">{fieldErrors.currentValue}</small>}
             </div>
 
             <div className="form-group">
@@ -681,7 +745,10 @@ function PropertyDetails({
                   formData.valuationDate
                 }
                 onChange={handleChange}
+                max={new Date().toISOString().split("T")[0]}
+                required
               />
+              {fieldErrors.valuationDate && <small className="field-error">{fieldErrors.valuationDate}</small>}
             </div>
 
             <div className="form-group full-width">
